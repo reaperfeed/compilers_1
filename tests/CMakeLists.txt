@@ -14,8 +14,9 @@ add_executable(graph_tests
 
 target_link_libraries(graph_tests
         PRIVATE
-        graph
+        tools
         Catch2::Catch2WithMain
+        frontend_lib
 )
 
 include(CTest)

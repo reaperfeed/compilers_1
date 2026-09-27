@@ -1,0 +1,9 @@
+i32 main()
+{
+    prints("entering infinite loop...\n");
+    while (1)
+    {
+    }
+    prints("unreachable\n");
+    return 0;
+}

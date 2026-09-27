@@ -1,0 +1,12 @@
+i32 recurse(i32 n)
+{
+    return recurse(n + 1);
+}
+
+i32 main()
+{
+    prints("starting deep recursion...\n");
+    i32 r = recurse(0);
+    printi(r);
+    return 0;
+}
