@@ -8,7 +8,7 @@
 
 namespace sema {
 
-// один именованный объект в области видимости.
+// один именованный объект в области видимости
 // хранит имя и что это было
 	struct Symbol {
 		std::string name;
@@ -17,7 +17,7 @@ namespace sema {
 	};
 
 // один лексический scope, ссылается на родителя для поиска
-	class Scope {
+	class Scope { // область видимости
 	public:
 		explicit Scope(Scope* parent) noexcept : parent_(parent) {}
 

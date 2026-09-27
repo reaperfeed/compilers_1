@@ -51,8 +51,8 @@ namespace interp {
 
 	class Interpreter {
 	public:
-		static constexpr std::size_t kMaxCallDepth      = 256;
-		static constexpr std::size_t kMaxLoopIterations = 1'000'000;
+		static constexpr std::size_t kMaxCallDepth      = 256;        // максимальная глубина рекурсии
+		static constexpr std::size_t kMaxLoopIterations = 1'000'000;  // максимальная глубина циклов
 
 		explicit Interpreter(std::ostream& out);
 

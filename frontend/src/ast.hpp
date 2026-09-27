@@ -182,7 +182,7 @@ namespace ast {
 		AstTree tree_;
 	};
 
-// --- Диагностика: печать AST в dot ---
+// печать AST в dot
 	void dump_dot(const AstTree &t, std::ostream &out);
 
 } // namespace ast
