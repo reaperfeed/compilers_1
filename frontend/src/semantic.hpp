@@ -53,6 +53,9 @@ namespace sema {
 	private:
 		void visit(ast::ConstNodeIt node);
 
+		Type check_expression(ast::ConstNodeIt node);
+		Type check_type_node(ast::ConstNodeIt node);
+
 		void visit_program(ast::ConstNodeIt node);
 		void visit_function(ast::ConstNodeIt node);
 		void visit_block(ast::ConstNodeIt node);
@@ -61,6 +64,10 @@ namespace sema {
 		void visit_identifier(ast::ConstNodeIt node);
 		void visit_call(ast::ConstNodeIt node);
 		void visit_children(ast::ConstNodeIt node);
+		void visit_return(ast::ConstNodeIt node);
+		void visit_conditional(ast::ConstNodeIt node);
+
+		Type current_function_return_type_ = Type::Unknown;
 
 		ScopeStack  scopes_;
 		std::size_t depth_ = 0;

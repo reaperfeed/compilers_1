@@ -1,0 +1,9 @@
+i32 main() {
+    f32 x = 5;         // OK: int -> float
+    //i32 y = 3.14;      // ОШИБКА: type mismatch
+    //f32 z = true;      // ОШИБКА: type mismatch
+    i32 q = 10 % 3;    // OK
+    //f32 r = 3.14 % 2;  // ОШИБКА: modulo requires i32
+    if (1) {}          // ОШИБКА: condition must be bool
+    return 0;
+}

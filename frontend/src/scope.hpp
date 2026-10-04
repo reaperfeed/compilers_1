@@ -7,13 +7,44 @@
 #include "source_location.hpp"
 
 namespace sema {
+	enum class Type {
+		Int,
+		Float,
+		Bool,
+		Char,
+		String,
+		Void,
+		Unknown
+	};
+
+	inline std::string type_to_string(Type t) {
+		switch (t) {
+			case Type::Int:    return "i32";
+			case Type::Float:  return "f32";
+			case Type::Bool:   return "bool";
+			case Type::Char:   return "char";
+			case Type::String: return "string";
+			case Type::Void:   return "void";
+			default:           return "unknown";
+		}
+	}
+
+	inline bool is_assignable(Type target, Type source) {
+		if (target == source) return true;
+		// int можно безопасно привести к float
+		if (target == Type::Float && source == Type::Int) return true;
+		return false;
+	}
 
 // один именованный объект в области видимости
 // хранит имя и что это было
 	struct Symbol {
 		std::string name;
 		enum class Kind { Variable, Parameter, Function } kind = Kind::Variable;
-		ast::SourceLocation loc;    // для определения места ошибки
+		Type type = Type::Unknown;               // тип переменной/возврата функции
+		std::vector<Type> param_types;           // сигнатура функции
+		bool is_variadic = false;                // для printf
+		ast::SourceLocation loc;                 // локация для ошибок
 	};
 
 // один лексический scope, ссылается на родителя для поиска
@@ -43,6 +74,14 @@ namespace sema {
 		const Symbol* lookup_local(const std::string& name) const noexcept {
 			auto it = symbols_.find(name);
 			return it == symbols_.end() ? nullptr : &it->second;
+		}
+
+		Symbol* lookup_mutable(const std::string& name) noexcept {
+			for (Scope* s = this; s != nullptr; s = s->parent_) {
+				auto it = s->symbols_.find(name);
+				if (it != s->symbols_.end()) return &it->second;
+			}
+			return nullptr;
 		}
 
 		Scope* parent() const noexcept { return parent_; }

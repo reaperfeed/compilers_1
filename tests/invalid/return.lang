@@ -1,0 +1,11 @@
+f32 get_value() {
+    return 42;      // OK: int -> float
+}
+
+/*i32 wrong_return() {
+    return 3.14;    // ошибка: return type mismatch
+} */
+
+i32 int_func() {
+    return true;    // ошибка: return type mismatch (bool -> i32)
+}
