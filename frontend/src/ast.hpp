@@ -30,6 +30,7 @@ namespace ast {
 		Return,
 		// выражения
 		Number,          // value: int64_t
+		FloatLit,        // value: double
 		BoolLit,         // value: bool
 		CharLit,         // value: char
 		StringLit,       // value: std::string
@@ -41,7 +42,7 @@ namespace ast {
 		Index,
 	};
 
-	enum class TypeKind { Int, Bool, Char };
+	enum class TypeKind { Int, Float, Bool, Char };
 
 	enum class BinaryOp {
 		Add, Sub, Mul, Div, Mod,
@@ -61,6 +62,7 @@ namespace ast {
 		std::variant<
 				std::monostate,
 				int64_t,
+				double,
 				bool,
 				char,
 				std::string,
@@ -131,6 +133,9 @@ namespace ast {
 		}
 		NodeIt number(int64_t v, SourceLocation loc) {
 			return tree_.new_node(AstNode{NodeKind::Number, loc, v});
+		}
+		NodeIt floating(double v, SourceLocation loc) {
+			return tree_.new_node(AstNode{NodeKind::FloatLit, loc, v});
 		}
 		NodeIt boolean(bool v, SourceLocation loc) {
 			return tree_.new_node(AstNode{NodeKind::BoolLit, loc, v});

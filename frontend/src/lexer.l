@@ -53,6 +53,7 @@ INT     {DIGIT}+
 "while"         { return yy::Parser::make_WHILE(yylloc); }
 "for"           { return yy::Parser::make_FOR(yylloc); }
 "return"        { return yy::Parser::make_RETURN(yylloc); }
+"f32"           { return yy::Parser::make_F32(yylloc); }
 "i32"           { return yy::Parser::make_I32(yylloc); }
 "bool"          { return yy::Parser::make_BOOL(yylloc); }
 "char"          { return yy::Parser::make_CHAR(yylloc); }
@@ -61,7 +62,9 @@ INT     {DIGIT}+
 "false"         { return yy::Parser::make_FALSE_LIT(yylloc); }
 
 {ID}            { return yy::Parser::make_IDENTIFIER(std::string(yytext), yylloc); }
-{INT}           { return yy::Parser::make_NUMBER(std::stoll(yytext), yylloc); }
+{DIGIT}+"."{DIGIT}*    { return yy::Parser::make_FLOAT(std::stod(yytext), yylloc); }
+{DIGIT}*"."{DIGIT}+    { return yy::Parser::make_FLOAT(std::stod(yytext), yylloc); }
+{INT}                  { return yy::Parser::make_NUMBER(std::stoll(yytext), yylloc); }
 
 \'([^'\\]|\\.)\'    {
                         char value = 0;

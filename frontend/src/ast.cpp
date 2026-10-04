@@ -22,6 +22,7 @@ namespace ast {
 				case NodeKind::For:        return "For";
 				case NodeKind::Return:     return "Return";
 				case NodeKind::Number:     return "Number";
+				case NodeKind::FloatLit:   return "Float";
 				case NodeKind::BoolLit:    return "Bool";
 				case NodeKind::CharLit:    return "Char";
 				case NodeKind::StringLit:  return "String";
@@ -94,6 +95,8 @@ namespace ast {
 				if constexpr (std::is_same_v<T, std::monostate>) {
 				} else if constexpr (std::is_same_v<T, int64_t>) {
 					base += ": " + std::to_string(v);
+				} else if constexpr (std::is_same_v<T, double>) {
+					base += ": " + std::to_string(v);
 				} else if constexpr (std::is_same_v<T, bool>) {
 					base += v ? ": true" : ": false";
 				} else if constexpr (std::is_same_v<T, char>) {
@@ -102,6 +105,7 @@ namespace ast {
 					base += ": " + v;
 				} else if constexpr (std::is_same_v<T, TypeKind>) {
 					base += v == TypeKind::Int  ? ": i32"
+					                            : v == TypeKind::Float ? ": f32"
 					                            : v == TypeKind::Bool ? ": bool"
 					                                                  : ": char";
 				} else if constexpr (std::is_same_v<T, BinaryOp>) {

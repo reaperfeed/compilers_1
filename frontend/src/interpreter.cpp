@@ -1,6 +1,7 @@
 #include "interpreter.hpp"
 
 #include <iostream>
+#include <cmath>
 
 namespace interp {
 
@@ -56,7 +57,8 @@ namespace interp {
 	}
 
 	int64_t Interpreter::as_int(const Value& v) {
-		if (auto* n = std::get_if<int64_t>(&v.data))     return *n;
+		if (auto* n = std::get_if<int64_t>(&v.data)) return *n;
+		if (auto* d = std::get_if<double>(&v.data))    return static_cast<int64_t>(*d);
 		if (auto* b = std::get_if<bool>(&v.data))        return *b ? 1 : 0;
 		if (auto* c = std::get_if<char>(&v.data))        return static_cast<int64_t>(*c);
 		if (std::holds_alternative<std::monostate>(v.data)) return 0;
@@ -66,9 +68,22 @@ namespace interp {
 	bool Interpreter::as_bool(const Value& v) {
 		if (auto* b = std::get_if<bool>(&v.data))     return *b;
 		if (auto* n = std::get_if<int64_t>(&v.data))  return *n != 0;
+		if (auto* d = std::get_if<double>(&v.data))   return *d != 0.0;
 		if (auto* c = std::get_if<char>(&v.data))     return *c != 0;
 		if (std::holds_alternative<std::monostate>(v.data)) return false;
 		return true;  // массивы, строки, указатели считаются истинными, если не null
+	}
+
+	double Interpreter::as_double(const Value& v) { 
+		if (auto* d = std::get_if<double>(&v.data))    return *d;
+		if (auto* n = std::get_if<int64_t>(&v.data))   return static_cast<double>(*n);
+		if (auto* c = std::get_if<char>(&v.data))      return static_cast<double>(*c);
+		if (auto* b = std::get_if<bool>(&v.data))      return *b ? 1.0 : 0.0;
+		throw RuntimeError("expected numeric value");
+	}
+
+	bool Interpreter::is_float(const Value& v) { 
+		return std::holds_alternative<double>(v.data);
 	}
 
 	void Interpreter::collect_functions(const ast::AstTree& tree) {
@@ -85,6 +100,7 @@ namespace interp {
 				auto tk = std::get<ast::TypeKind>(type_node->data().value);
 				switch (tk) {
 					case ast::TypeKind::Int:  return std::make_shared<Value>(int64_t{0});
+					case ast::TypeKind::Float: return std::make_shared<Value>(0.0);
 					case ast::TypeKind::Bool: return std::make_shared<Value>(false);
 					case ast::TypeKind::Char: return std::make_shared<Value>('\0');
 				}
@@ -145,6 +161,60 @@ namespace interp {
 	}
 
 	Value Interpreter::call_function(const std::string& name, std::vector<Value> args) {
+		if (name == "printf") {
+			if (args.empty()) throw RuntimeError("printf: format string expected");
+			const auto* fs = std::get_if<std::string>(&args[0].data);
+			if (!fs) throw RuntimeError("printf: first argument must be a string");
+
+			std::size_t ai = 1;          // индекс следующего аргумента
+			std::string res;
+
+			for (std::size_t i = 0; i < fs->size(); ++i) {
+				char c = (*fs)[i];
+				if (c != '%' || i + 1 >= fs->size()) { res += c; continue; }
+				char spec = (*fs)[++i];
+				switch (spec) {
+					case '%': res += '%'; break;
+					case 'd': {
+						if (ai >= args.size()) throw RuntimeError("printf: not enough arguments");
+						res += std::to_string(as_int(args[ai++]));
+						break;
+					}
+					case 'f': {
+						if (ai >= args.size()) throw RuntimeError("printf: not enough arguments");
+						char buf[64];
+						std::snprintf(buf, sizeof(buf), "%f", as_double(args[ai++]));
+						res += buf;
+						break;
+					}
+					case 'g': {   // компактный вывод: 3.14 вместо 3.140000
+						if (ai >= args.size()) throw RuntimeError("printf: not enough arguments");
+						char buf[64];
+						std::snprintf(buf, sizeof(buf), "%g", as_double(args[ai++]));
+						res += buf;
+						break;
+					}
+					case 'c': {
+						if (ai >= args.size()) throw RuntimeError("printf: not enough arguments");
+						const auto& v = args[ai++];
+						if (auto* ch = std::get_if<char>(&v.data))        res += *ch;
+						else if (auto* n = std::get_if<int64_t>(&v.data)) res += static_cast<char>(*n);
+						else throw RuntimeError("printf: %c expects char");
+						break;
+					}
+					case 's': {
+						if (ai >= args.size()) throw RuntimeError("printf: not enough arguments");
+						if (auto* s = std::get_if<std::string>(&args[ai++].data)) res += *s;
+						else throw RuntimeError("printf: %s expects string");
+						break;
+					}
+					default:
+						throw RuntimeError(std::string("printf: unknown format specifier '%") + spec + "'");
+				}
+			}
+			out_ << res;
+			return Value{int64_t{0}};
+		}
 		if (name == "prints" || name == "printi") {
 			if (!args.empty()) {
 				const auto& v = args[0];
@@ -231,6 +301,7 @@ namespace interp {
 		const auto& d = node->data();
 		switch (d.kind) {
 			case ast::NodeKind::Number:    return Value{std::get<int64_t>(d.value)};
+			case ast::NodeKind::FloatLit:  return Value{std::get<double>(d.value)};
 			case ast::NodeKind::BoolLit:   return Value{std::get<bool>(d.value)};
 			case ast::NodeKind::CharLit:   return Value{std::get<char>(d.value)};
 			case ast::NodeKind::StringLit: return Value{std::get<std::string>(d.value)};
@@ -271,26 +342,60 @@ namespace interp {
 
 				switch (op) {
 					case ast::AssignOp::Assign: *target = rv; break;
-					case ast::AssignOp::Add:    *target = Value{as_int(*target) + as_int(rv)}; break;
-					case ast::AssignOp::Sub:    *target = Value{as_int(*target) - as_int(rv)}; break;
-					case ast::AssignOp::Mul:    *target = Value{as_int(*target) * as_int(rv)}; break;
-					case ast::AssignOp::Div: {
-						int64_t div = as_int(rv);
-						if (div == 0) throw RuntimeError("division by zero");
-						*target = Value{as_int(*target) / div};
-						break;
-					}
+
+					case ast::AssignOp::Add:
+					case ast::AssignOp::Sub:
+					case ast::AssignOp::Mul:
+					case ast::AssignOp::Div:
 					case ast::AssignOp::Mod: {
-						int64_t div = as_int(rv);
-						if (div == 0) throw RuntimeError("modulo by zero");
-						*target = Value{as_int(*target) % div};
+						if (is_float(*target) || is_float(rv)) {
+							double a = as_double(*target), b = as_double(rv);
+							switch (op) {
+								case ast::AssignOp::Add: *target = Value{a + b}; break;
+								case ast::AssignOp::Sub: *target = Value{a - b}; break;
+								case ast::AssignOp::Mul: *target = Value{a * b}; break;
+								case ast::AssignOp::Div:
+									if (b == 0.0) throw RuntimeError("division by zero");
+									*target = Value{a / b}; break;
+								case ast::AssignOp::Mod:
+									if (b == 0.0) throw RuntimeError("modulo by zero");
+									*target = Value{std::fmod(a, b)}; break;
+								default: break;
+							}
+						} else {
+							int64_t a = as_int(*target), b = as_int(rv);
+							switch (op) {
+								case ast::AssignOp::Add: *target = Value{a + b}; break;
+								case ast::AssignOp::Sub: *target = Value{a - b}; break;
+								case ast::AssignOp::Mul: *target = Value{a * b}; break;
+								case ast::AssignOp::Div:
+									if (b == 0) throw RuntimeError("division by zero");
+									*target = Value{a / b}; break;
+								case ast::AssignOp::Mod:
+									if (b == 0) throw RuntimeError("modulo by zero");
+									*target = Value{a % b}; break;
+								default: break;
+							}
+						}
 						break;
 					}
-					case ast::AssignOp::BitAnd: *target = Value{as_int(*target) &  as_int(rv)}; break;
-					case ast::AssignOp::BitOr:  *target = Value{as_int(*target) |  as_int(rv)}; break;
-					case ast::AssignOp::BitXor: *target = Value{as_int(*target) ^  as_int(rv)}; break;
-					case ast::AssignOp::Shl:    *target = Value{as_int(*target) << as_int(rv)}; break;
-					case ast::AssignOp::Shr:    *target = Value{as_int(*target) >> as_int(rv)}; break;
+
+					case ast::AssignOp::BitAnd:
+					case ast::AssignOp::BitOr:
+					case ast::AssignOp::BitXor:
+					case ast::AssignOp::Shl:
+					case ast::AssignOp::Shr:
+						if (is_float(*target) || is_float(rv))
+							throw RuntimeError("bitwise operation on float value");
+						switch (op) {
+							case ast::AssignOp::BitAnd: *target = Value{as_int(*target) &  as_int(rv)}; break;
+							case ast::AssignOp::BitOr:  *target = Value{as_int(*target) |  as_int(rv)}; break;
+							case ast::AssignOp::BitXor: *target = Value{as_int(*target) ^  as_int(rv)}; break;
+							case ast::AssignOp::Shl:    *target = Value{as_int(*target) << as_int(rv)}; break;
+							case ast::AssignOp::Shr:    *target = Value{as_int(*target) >> as_int(rv)}; break;
+							default: break;
+						}
+						break;
 				}
 				return *target;
 			}
@@ -503,6 +608,33 @@ namespace interp {
 // операции
 
 	Value Interpreter::eval_binary(ast::BinaryOp op, const Value& a, const Value& b) {
+		if (is_float(a) || is_float(b)) {
+			double da = as_double(a), db = as_double(b);
+			switch (op) {
+				case ast::BinaryOp::Add: return Value{da + db};
+				case ast::BinaryOp::Sub: return Value{da - db};
+				case ast::BinaryOp::Mul: return Value{da * db};
+				case ast::BinaryOp::Div:
+					if (db == 0.0) throw RuntimeError("division by zero");
+					return Value{da / db};
+				case ast::BinaryOp::Mod:
+					if (db == 0.0) throw RuntimeError("modulo by zero");
+					return Value{std::fmod(da, db)};
+
+				case ast::BinaryOp::Eq: return Value{da == db};
+				case ast::BinaryOp::Ne: return Value{da != db};
+				case ast::BinaryOp::Lt: return Value{da <  db};
+				case ast::BinaryOp::Gt: return Value{da >  db};
+				case ast::BinaryOp::Le: return Value{da <= db};
+				case ast::BinaryOp::Ge: return Value{da >= db};
+
+				case ast::BinaryOp::LogAnd: return Value{as_bool(a) && as_bool(b)};
+				case ast::BinaryOp::LogOr:  return Value{as_bool(a) || as_bool(b)};
+
+				default:
+					throw RuntimeError("bitwise operation on float value");
+			}
+		}
 		switch (op) {
 			case ast::BinaryOp::Eq: return Value{as_int(a) == as_int(b)};
 			case ast::BinaryOp::Ne: return Value{as_int(a) != as_int(b)};
@@ -539,9 +671,13 @@ namespace interp {
 
 	Value Interpreter::eval_unary(ast::UnaryOp op, const Value& a) {
 		switch (op) {
-			case ast::UnaryOp::Neg:    return Value{-as_int(a)};
+			case ast::UnaryOp::Neg:
+				if (is_float(a)) return Value{-as_double(a)};
+				return Value{-as_int(a)};
 			case ast::UnaryOp::Not:    return Value{!as_bool(a)};
-			case ast::UnaryOp::BitNot: return Value{~as_int(a)};
+			case ast::UnaryOp::BitNot:
+				if (is_float(a)) throw RuntimeError("bitwise not on float value");
+				return Value{~as_int(a)};
 			case ast::UnaryOp::Deref: {
 				// разыменование как rvalue: если это указатель — вернуть содержимое
 				if (auto* p = std::get_if<ValuePtr>(&const_cast<Value&>(a).data)) {

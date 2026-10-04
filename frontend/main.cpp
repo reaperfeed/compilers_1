@@ -77,6 +77,8 @@ int main(int argc, char** argv) {
 
 		if (auto* v = std::get_if<int64_t>(&result.data)) {
 			std::cout << "\nProgram returned " << *v << "\n";
+		} else if (auto* d = std::get_if<double>(&result.data)) {
+			std::cout << "\nProgram returned " << *d << "\n";
 		} else if (auto* b = std::get_if<bool>(&result.data)) {
 			std::cout << "\nProgram returned " << (*b ? "true" : "false") << "\n";
 		} else if (auto* c = std::get_if<char>(&result.data)) {

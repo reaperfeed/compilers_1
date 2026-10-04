@@ -22,7 +22,7 @@ namespace sema {
 		}
 
 // встроенные функции, доступные всегда
-		constexpr const char* kBuiltins[] = {"prints", "printi"};
+		constexpr const char* kBuiltins[] = {"prints", "printi", "printf"};
 
 	} // namespace
 

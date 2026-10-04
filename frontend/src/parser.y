@@ -38,13 +38,14 @@
 //токены
 %token END 0 "end of file"
 
+%token <double>      FLOAT
 %token <int64_t>     NUMBER
 %token <char>        CHAR_LITERAL
 %token <std::string> IDENTIFIER
 %token <std::string> STRING_LITERAL
 
 %token IF ELIF ELSE WHILE FOR RETURN
-%token I32 BOOL CHAR PTR TRUE_LIT FALSE_LIT
+%token F32 I32 BOOL CHAR PTR TRUE_LIT FALSE_LIT
 
 %token EQ NEQ LT GT LE GE
 %token AMP PIPE CARET TILDE NOT
@@ -124,6 +125,7 @@ function:
 /* типы */
 type:
     I32   { $$ = b.type_prim(ast::TypeKind::Int,  SL(@1)); }
+  | F32   { $$ = b.type_prim(ast::TypeKind::Float, SL(@1)); }
   | BOOL  { $$ = b.type_prim(ast::TypeKind::Bool, SL(@1)); }
   | CHAR  { $$ = b.type_prim(ast::TypeKind::Char, SL(@1)); }
   | PTR type
@@ -287,6 +289,7 @@ return_stmt:
 /* выражения */
 expression:
     NUMBER          { $$ = b.number($1, SL(@1)); }
+  | FLOAT           { $$ = b.floating($1, SL(@1)); }
   | CHAR_LITERAL    { $$ = b.ch($1, SL(@1)); }
   | STRING_LITERAL  { $$ = b.string(std::move($1), SL(@1)); }
   | TRUE_LIT        { $$ = b.boolean(true,  SL(@1)); }

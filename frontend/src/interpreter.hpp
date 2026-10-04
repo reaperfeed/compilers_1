@@ -25,6 +25,7 @@ namespace interp {
 		std::variant<
 				std::monostate,   // void
 				int64_t,
+				double,
 				bool,
 				char,
 				std::string,
@@ -34,6 +35,7 @@ namespace interp {
 
 		Value() : data(std::monostate{}) {}
 		Value(int64_t v) : data(v) {}
+		Value(double v)  : data(v) {}
 		Value(bool v)    : data(v) {}
 		Value(char v)    : data(v) {}
 		Value(std::string v) : data(std::move(v)) {}
@@ -89,6 +91,8 @@ namespace interp {
 
 		static int64_t as_int (const Value& v);
 		static bool    as_bool(const Value& v);
+		static double  as_double(const Value& v);
+		static bool    is_float(const Value& v);
 
 		Value eval_binary(ast::BinaryOp op, const Value& a, const Value& b);
 		Value eval_unary (ast::UnaryOp  op, const Value& a);
