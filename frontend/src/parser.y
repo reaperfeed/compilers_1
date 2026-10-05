@@ -45,7 +45,7 @@
 %token <std::string> STRING_LITERAL
 
 %token IF ELIF ELSE WHILE FOR RETURN
-%token F32 I32 BOOL CHAR PTR TRUE_LIT FALSE_LIT
+%token F32 I32 VOID BOOL CHAR PTR TRUE_LIT FALSE_LIT
 
 %token EQ NEQ LT GT LE GE
 %token AMP PIPE CARET TILDE NOT
@@ -126,6 +126,7 @@ function:
 type:
     I32   { $$ = b.type_prim(ast::TypeKind::Int,  SL(@1)); }
   | F32   { $$ = b.type_prim(ast::TypeKind::Float, SL(@1)); }
+  | VOID  { $$ = b.type_prim(ast::TypeKind::Void,  SL(@1)); }
   | BOOL  { $$ = b.type_prim(ast::TypeKind::Bool, SL(@1)); }
   | CHAR  { $$ = b.type_prim(ast::TypeKind::Char, SL(@1)); }
   | PTR type

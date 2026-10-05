@@ -47,6 +47,7 @@ namespace sema {
 				switch (*tk) {
 					case ast::TypeKind::Int:   return Type::Int;
 					case ast::TypeKind::Float: return Type::Float;
+					case ast::TypeKind::Void:  return Type::Void;
 					case ast::TypeKind::Bool:  return Type::Bool;
 					case ast::TypeKind::Char:  return Type::Char;
 				}

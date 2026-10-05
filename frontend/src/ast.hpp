@@ -42,7 +42,7 @@ namespace ast {
 		Index,
 	};
 
-	enum class TypeKind { Int, Float, Bool, Char };
+	enum class TypeKind { Int, Float, Bool, Char, Void };
 
 	enum class BinaryOp {
 		Add, Sub, Mul, Div, Mod,

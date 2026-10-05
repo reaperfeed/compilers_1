@@ -106,6 +106,7 @@ namespace ast {
 				} else if constexpr (std::is_same_v<T, TypeKind>) {
 					base += v == TypeKind::Int  ? ": i32"
 					                            : v == TypeKind::Float ? ": f32"
+												: v == TypeKind::Void  ? ": void"
 					                            : v == TypeKind::Bool ? ": bool"
 					                                                  : ": char";
 				} else if constexpr (std::is_same_v<T, BinaryOp>) {

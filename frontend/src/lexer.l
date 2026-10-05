@@ -55,6 +55,7 @@ INT     {DIGIT}+
 "return"        { return yy::Parser::make_RETURN(yylloc); }
 "f32"           { return yy::Parser::make_F32(yylloc); }
 "i32"           { return yy::Parser::make_I32(yylloc); }
+"void"          { return yy::Parser::make_VOID(yylloc); }
 "bool"          { return yy::Parser::make_BOOL(yylloc); }
 "char"          { return yy::Parser::make_CHAR(yylloc); }
 "ptr"           { return yy::Parser::make_PTR(yylloc); }

@@ -6,6 +6,6 @@ f32 get_value() {
     return 3.14;    // ошибка: return type mismatch
 } */
 
-i32 int_func() {
-    return true;    // ошибка: return type mismatch (bool -> i32)
+void int_func() {
+    return 5;    // ошибка: return type mismatch (void -> i32)
 }
