@@ -21,6 +21,8 @@ namespace sema {
 	} // namespace
 
 	void SemanticAnalyzer::analyze(const ast::AstTree& tree) {
+        scopes_ = ScopeStack{};
+        current_function_return_type_ = Type::Unknown;
 		// prints, printi — с одним аргументом любого типа
 		for (auto name : {"prints", "printi"}) {
 			Symbol s{name, Symbol::Kind::Function, Type::Int, {}, false, {}};
@@ -88,6 +90,13 @@ namespace sema {
 					else if (idx == 1) rt = check_expression((*it)->next_node());
 				}
 
+                // Detailed pointer/array typing is performed by the HIR translator.
+                // Unknown composite expressions must reach that check.
+                if (lt == Type::Unknown || rt == Type::Unknown) {
+                    if (op >= ast::BinaryOp::Eq && op <= ast::BinaryOp::Ge) return Type::Bool;
+                    if (op == ast::BinaryOp::LogAnd || op == ast::BinaryOp::LogOr) return Type::Bool;
+                    return Type::Unknown;
+                }
 				auto is_numeric = [](Type t) { return t == Type::Int || t == Type::Float; };
 				auto promote = [&](Type a, Type b) -> Type {
 					return (a == Type::Float || b == Type::Float) ? Type::Float : Type::Int;
@@ -141,6 +150,7 @@ namespace sema {
 				Type ot = Type::Unknown;
 				for (auto it = node->out_begin(); it != node->out_end(); ++it)
 					ot = check_expression((*it)->next_node());
+                if (ot == Type::Unknown) return Type::Unknown;
 				switch (op) {
 					case ast::UnaryOp::Neg:
 						if (ot != Type::Int && ot != Type::Float)
@@ -230,7 +240,7 @@ namespace sema {
 				if (fn && fn->kind == Symbol::Kind::Function) {
 					// printf — вариадический, только первый аргумент проверяем
 					if (fn->is_variadic) {
-						if (arg_types.empty() || arg_types[0] != Type::String) {
+						if (arg_types.empty() || (arg_types[0] != Type::String && arg_types[0] != Type::Unknown)) {
 							throw err::CompileError(err::Stage::Semantic, node->data().loc,
 							                        "printf requires format string as first argument");
 						}
@@ -289,28 +299,25 @@ namespace sema {
 	}
 
 	void SemanticAnalyzer::visit_program(ast::ConstNodeIt node) {
-		for_each_child_with_role(node, ast::EdgeRole::Func,
-		                         [this](ast::ConstNodeIt fn) {
-			                         if (auto* name = node_name(fn->data())) {
-				                         Symbol sym{
-						                         *name,
-						                         Symbol::Kind::Function,
-						                         Type::Unknown,
-						                         {},
-						                         false,
-						                         fn->data().loc
-				                         };
-				                         if (!scopes_.current().declare(std::move(sym))) {
-					                         throw err::CompileError(
-							                         err::Stage::Semantic, fn->data().loc,
-							                         "redefinition of function '" + *name + "'");
-				                         }
-			                         }
-		                         });
-
-		for_each_child_with_role(node, ast::EdgeRole::Func,
-		                         [this](ast::ConstNodeIt fn) { visit(fn); });
-	}
+        // Register full signatures before visiting any body (including forward calls).
+        for_each_child_with_role(node, ast::EdgeRole::Func, [this](ast::ConstNodeIt fn) {
+            if (auto* name = node_name(fn->data())) {
+                Symbol sym{*name, Symbol::Kind::Function, Type::Unknown, {}, false, fn->data().loc};
+                for_each_child_with_role(fn, ast::EdgeRole::ReturnType,
+                    [this, &sym](ast::ConstNodeIt t) { sym.type = check_type_node(t); });
+                for_each_child_with_role(fn, ast::EdgeRole::Param, [this, &sym](ast::ConstNodeIt p) {
+                    for_each_child_with_role(p, ast::EdgeRole::DeclType,
+                        [this, &sym](ast::ConstNodeIt t) { sym.param_types.push_back(check_type_node(t)); });
+                });
+                if (!scopes_.current().declare(std::move(sym))) {
+                    throw err::CompileError(err::Stage::Semantic, fn->data().loc,
+                                            "redefinition of function '" + *name + "'");
+                }
+            }
+        });
+        for_each_child_with_role(node, ast::EdgeRole::Func,
+                                 [this](ast::ConstNodeIt fn) { visit(fn); });
+    }
 
 	void SemanticAnalyzer::visit_function(ast::ConstNodeIt node) {
 		ScopeGuard sg(scopes_);
@@ -413,6 +420,7 @@ namespace sema {
 			                        "void function cannot return a value");
 		}
 		if (current_function_return_type_ != Type::Void &&
+            current_function_return_type_ != Type::Unknown &&
 		    ret_type != Type::Unknown &&
 		    !is_assignable(current_function_return_type_, ret_type)) {
 			throw err::CompileError(err::Stage::Semantic, node->data().loc,

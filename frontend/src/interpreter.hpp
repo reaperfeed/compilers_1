@@ -89,6 +89,9 @@ namespace interp {
 		ValuePtr eval_lvalue(ast::ConstNodeIt node);   // для присваиваний и &
 		void     exec(ast::ConstNodeIt node);
 
+		static ValuePtr array_slot(const Value& base, int64_t index);
+        static Value coerce_for_type(Value value, ast::ConstNodeIt type_node);
+
 		static int64_t as_int (const Value& v);
 		static bool    as_bool(const Value& v);
 		static double  as_double(const Value& v);

@@ -56,6 +56,13 @@ namespace interp {
 		throw RuntimeError("undefined identifier '" + name + "'");
 	}
 
+    Value Interpreter::coerce_for_type(Value value, ast::ConstNodeIt type_node) {
+        if (type_node->data().kind == ast::NodeKind::TypePrim &&
+            std::get<ast::TypeKind>(type_node->data().value) == ast::TypeKind::Float &&
+            std::holds_alternative<int64_t>(value.data)) return Value{as_double(value)};
+        return value;
+    }
+
 	int64_t Interpreter::as_int(const Value& v) {
 		if (auto* n = std::get_if<int64_t>(&v.data)) return *n;
 		if (auto* d = std::get_if<double>(&v.data))    return static_cast<int64_t>(*d);
@@ -103,6 +110,7 @@ namespace interp {
 					case ast::TypeKind::Float: return std::make_shared<Value>(0.0);
 					case ast::TypeKind::Bool: return std::make_shared<Value>(false);
 					case ast::TypeKind::Char: return std::make_shared<Value>('\0');
+                    case ast::TypeKind::Void: throw RuntimeError("variable cannot have void type");
 				}
 				break;
 			}
@@ -130,6 +138,7 @@ namespace interp {
 
 	Value Interpreter::run(const ast::AstTree& tree,
 	                       const std::vector<std::string>& script_args) {
+        scopes_.clear(); functions_.clear(); call_depth_ = 0;
 		collect_functions(tree);
 
 		auto main_it = functions_.find("main");
@@ -274,6 +283,7 @@ namespace interp {
 			for_each_child(fn, ast::EdgeRole::Param, [&](ast::ConstNodeIt param) {
 				const auto& pname = std::get<std::string>(param->data().value);
 				Value v = i < args.size() ? args[i] : Value{};
+                if (auto type = child_or_none(param, ast::EdgeRole::DeclType)) v = coerce_for_type(std::move(v), *type);
 				declare(pname, std::make_shared<Value>(std::move(v)));
 				++i;
 			});
@@ -284,6 +294,7 @@ namespace interp {
 				});
 			} catch (ReturnSignal& s) {
 				result = std::move(s.value);
+                if (auto type = child_or_none(fn, ast::EdgeRole::ReturnType)) result = coerce_for_type(std::move(result), *type);
 			}
 		} catch (...) {
 			pop_scope();
@@ -315,7 +326,12 @@ namespace interp {
 				auto lhs = child_or_none(node, ast::EdgeRole::Lhs);
 				auto rhs = child_or_none(node, ast::EdgeRole::Rhs);
 				if (!lhs || !rhs) throw RuntimeError("binary missing operand");
-				return eval_binary(std::get<ast::BinaryOp>(d.value), eval(*lhs), eval(*rhs));
+                auto code = std::get<ast::BinaryOp>(d.value);
+                Value left = eval(*lhs);
+                if (code == ast::BinaryOp::LogAnd && !as_bool(left)) return Value{false};
+                if (code == ast::BinaryOp::LogOr && as_bool(left)) return Value{true};
+                Value right = eval(*rhs);
+                return eval_binary(code, left, right);
 			}
 
 			case ast::NodeKind::Unary: {
@@ -337,19 +353,22 @@ namespace interp {
 				if (!lhs || !rhs) throw RuntimeError("assign missing operand");
 
 				ValuePtr target = eval_lvalue(*lhs);
+                Value old = *target;
 				Value    rv     = eval(*rhs);
 				auto op = std::get<ast::AssignOp>(d.value);
 
 				switch (op) {
-					case ast::AssignOp::Assign: *target = rv; break;
+					case ast::AssignOp::Assign:
+                        *target = is_float(old) && std::holds_alternative<int64_t>(rv.data) ? Value{as_double(rv)} : rv;
+                        break;
 
 					case ast::AssignOp::Add:
 					case ast::AssignOp::Sub:
 					case ast::AssignOp::Mul:
 					case ast::AssignOp::Div:
 					case ast::AssignOp::Mod: {
-						if (is_float(*target) || is_float(rv)) {
-							double a = as_double(*target), b = as_double(rv);
+						if (is_float(old) || is_float(rv)) {
+							double a = as_double(old), b = as_double(rv);
 							switch (op) {
 								case ast::AssignOp::Add: *target = Value{a + b}; break;
 								case ast::AssignOp::Sub: *target = Value{a - b}; break;
@@ -363,7 +382,7 @@ namespace interp {
 								default: break;
 							}
 						} else {
-							int64_t a = as_int(*target), b = as_int(rv);
+							int64_t a = as_int(old), b = as_int(rv);
 							switch (op) {
 								case ast::AssignOp::Add: *target = Value{a + b}; break;
 								case ast::AssignOp::Sub: *target = Value{a - b}; break;
@@ -385,14 +404,14 @@ namespace interp {
 					case ast::AssignOp::BitXor:
 					case ast::AssignOp::Shl:
 					case ast::AssignOp::Shr:
-						if (is_float(*target) || is_float(rv))
+						if (is_float(old) || is_float(rv))
 							throw RuntimeError("bitwise operation on float value");
 						switch (op) {
-							case ast::AssignOp::BitAnd: *target = Value{as_int(*target) &  as_int(rv)}; break;
-							case ast::AssignOp::BitOr:  *target = Value{as_int(*target) |  as_int(rv)}; break;
-							case ast::AssignOp::BitXor: *target = Value{as_int(*target) ^  as_int(rv)}; break;
-							case ast::AssignOp::Shl:    *target = Value{as_int(*target) << as_int(rv)}; break;
-							case ast::AssignOp::Shr:    *target = Value{as_int(*target) >> as_int(rv)}; break;
+							case ast::AssignOp::BitAnd: *target = Value{as_int(old) &  as_int(rv)}; break;
+							case ast::AssignOp::BitOr:  *target = Value{as_int(old) |  as_int(rv)}; break;
+							case ast::AssignOp::BitXor: *target = Value{as_int(old) ^  as_int(rv)}; break;
+							case ast::AssignOp::Shl:    *target = Value{as_int(old) << as_int(rv)}; break;
+							case ast::AssignOp::Shr:    *target = Value{as_int(old) >> as_int(rv)}; break;
 							default: break;
 						}
 						break;
@@ -431,13 +450,30 @@ namespace interp {
 				}
 
 				// массив или указатель на массив: берём lvalue и разыменовываем
-				return *eval_lvalue(node);
+				return *array_slot(base_v, i);
 			}
 
 			default:
 				throw RuntimeError("unsupported expression kind");
 		}
 	}
+
+    ValuePtr Interpreter::array_slot(const Value& base_v, int64_t i) {
+        Array arr;
+        if (auto* p = std::get_if<ValuePtr>(&base_v.data)) {
+            if (!*p) throw RuntimeError("null pointer dereference");
+            if (auto* a = std::get_if<Array>(&(*p)->data)) arr = *a;
+            else {
+                // A pointer obtained with &scalar denotes one element.
+                if (i != 0) throw RuntimeError("array index out of range");
+                return *p;
+            }
+        } else if (auto* a = std::get_if<Array>(&base_v.data)) arr = *a;
+        else throw RuntimeError("cannot index value of this type");
+        if (!arr) throw RuntimeError("null array");
+        if (i < 0 || i >= static_cast<int64_t>(arr->size())) throw RuntimeError("array index out of range");
+        return (*arr)[static_cast<std::size_t>(i)];
+    }
 
 	ValuePtr Interpreter::eval_lvalue(ast::ConstNodeIt node) {
 		const auto& d = node->data();
@@ -468,24 +504,7 @@ namespace interp {
 				Value base_v = eval(*base);
 				int64_t i    = as_int(eval(*sub));
 
-				Array arr;
-				if (auto* p = std::get_if<ValuePtr>(&base_v.data)) {
-					// указатель: разыменовываем и ждём, что там массив
-					if (!*p) throw RuntimeError("null pointer dereference");
-					auto* a = std::get_if<Array>(&(*p)->data);
-					if (!a) throw RuntimeError("cannot index non-array pointer");
-					arr = *a;
-				} else if (auto* a = std::get_if<Array>(&base_v.data)) {
-					arr = *a;
-				} else {
-					throw RuntimeError("cannot index value of this type");
-				}
-
-				if (!arr) throw RuntimeError("null array");
-				if (i < 0 || i >= static_cast<int64_t>(arr->size())) {
-					throw RuntimeError("array index out of range");
-				}
-				return (*arr)[static_cast<std::size_t>(i)];
+                return array_slot(base_v, i);
 			}
 
 			default:
@@ -525,7 +544,7 @@ namespace interp {
 						throw RuntimeError("cannot initialize array '" + name +
 						                   "' with an expression");
 					}
-					*slot = eval(*init);
+					*slot = coerce_for_type(eval(*init), *decl_type);
 				}
 				declare(name, std::move(slot));
 				break;
@@ -608,6 +627,13 @@ namespace interp {
 // операции
 
 	Value Interpreter::eval_binary(ast::BinaryOp op, const Value& a, const Value& b) {
+        if (auto* left = std::get_if<ValuePtr>(&a.data)) {
+            if (auto* right = std::get_if<ValuePtr>(&b.data)) {
+                if (op == ast::BinaryOp::Eq) return Value{*left == *right};
+                if (op == ast::BinaryOp::Ne) return Value{*left != *right};
+            }
+        }
+
 		if (is_float(a) || is_float(b)) {
 			double da = as_double(a), db = as_double(b);
 			switch (op) {
