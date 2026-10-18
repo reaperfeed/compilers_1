@@ -1,0 +1,31 @@
+i32 main(i32 argc, ptr ptr char argv)
+{
+    i32 i = 0;
+    while (i < argc)
+    {
+        prints("[");
+        printi(i);
+        prints("]");
+
+        if (i == 0)
+        {
+            prints("Program name: ");
+            prints(argv[i]);
+            prints("\n");
+        }
+        elif (argv[i][0] == '-')
+        {
+            prints("Option: ");
+            prints(argv[i]);
+            prints("\n");
+        }
+        else
+        {
+            prints(argv[i]);
+            prints("\n");
+        }
+
+        i += 1;
+    }
+    return 0;
+}

@@ -1,0 +1,16 @@
+f32 circle_area(f32 r) {
+    f32 pi = 3.14159;
+    return pi * r * r;
+}
+
+i32 main() {
+    f32 x = 2.5;
+    f32 s = circle_area(x);
+    printf("area = %f\n", s);          // area = 19.634938 (≈)
+    printf("mix  = %g\n", 1 + 2.5);    // mix  = 3.5
+    printf("int  = %d, str = %s\n", 42, "ok");
+    x += 0.5;
+    printf("x    = %g\n", x);          // x    = 3
+    prints("done\n");
+    return 0;
+}

@@ -1,0 +1,13 @@
+i32 main()
+{
+    i32 n = 20;
+    printi(n);
+    prints("\n");
+
+    i32 m = 5;
+    i32 s = m * 4;
+    printi(s);
+    prints("\n");
+
+    return 0;
+}

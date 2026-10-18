@@ -1,0 +1,14 @@
+i32 divide(i32 a, i32 b)
+{
+    return a / b;
+}
+
+i32 main()
+{
+    i32 x = 10;
+    i32 y = 0;
+    prints("about to divide...\n");
+    i32 r = divide(x, y);
+    printi(r);
+    return 0;
+}

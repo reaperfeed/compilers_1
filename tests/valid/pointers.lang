@@ -1,0 +1,35 @@
+i32 swap(ptr i32 a, ptr i32 b)
+{
+    i32 tmp = *a;
+    *a = *b;
+    *b = tmp;
+    return 0;
+}
+
+i32 main()
+{
+    i32 x = 10;
+    i32 y = 20;
+
+    prints("before: ");
+    printi(x);
+    prints(" ");
+    printi(y);
+    prints("\n");
+
+    swap(&x, &y);
+
+    prints("after:  ");
+    printi(x);
+    prints(" ");
+    printi(y);
+    prints("\n");
+
+    ptr i32 p = &x;
+    *p = 99;
+    prints("x after *p = 99: ");
+    printi(x);
+    prints("\n");
+
+    return 0;
+}
