@@ -39,13 +39,20 @@ INT     {DIGIT}+
 
 \n              {
                     current_line++;
-                    yylloc.end.column   = 0;
-                    yylloc.begin.column = 0;
+                    yylloc.end.column   = 1;
+                    yylloc.begin.column = 1;
                 }
 
 "//".*          { /* однострочный комментарий */ }
 
-"/*"([^*]|\*+[^*/])*\*+"/"  { /* многострочный комментарий */ }
+"/*"([^*]|\*+[^*/])*\*+"/"  {
+    int column = yylloc.begin.column;
+    for (int i = 0; i < yyleng; ++i) {
+        if (yytext[i] == '\n') { ++current_line; column = 1; }
+        else ++column;
+    }
+    yylloc.end.column = column;
+}
 
 "if"            { return yy::Parser::make_IF(yylloc); }
 "elif"          { return yy::Parser::make_ELIF(yylloc); }
@@ -163,3 +170,9 @@ INT     {DIGIT}+
                 }
 
 %%
+
+void reset_lexer(FILE* input) {
+    yyrestart(input);
+    current_line = 1;
+    yylloc.initialize();
+}

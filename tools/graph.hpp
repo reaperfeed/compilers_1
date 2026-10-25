@@ -229,7 +229,7 @@ template <Copyable Tnode_data, Copyable Tedge_data> class orgraph_t {
 			    std::in_place,
 			    std::forward<Targs>(args)...
 	    );
-	    GRAPH_ASSERT(this->check(), "Graph is invalid");
+	    GRAPH_ASSERT(orgraph_t::check(), "Graph is invalid");
         return node;
     }
 
@@ -237,7 +237,7 @@ template <Copyable Tnode_data, Copyable Tedge_data> class orgraph_t {
         requires(!std::is_void_v<Tedge_data>)
     {
 		auto edge = new_edge_impl(prev_, next_, data_);
-	    GRAPH_ASSERT(this->check(), "Graph is invalid");
+	    GRAPH_ASSERT(orgraph_t::check(), "Graph is invalid");
         return edge;
     }
 
@@ -245,7 +245,7 @@ template <Copyable Tnode_data, Copyable Tedge_data> class orgraph_t {
         requires detail::DataConstructible<Tedge_data, Targs...>
     edge_iterator new_edge(node_iterator prev_, node_iterator next_, Targs &&...args) {
 		auto edge = new_edge_impl(prev_, next_, std::forward<Targs>(args)...);
-	    GRAPH_ASSERT(this->check(), "Graph is invalid");
+	    GRAPH_ASSERT(orgraph_t::check(), "Graph is invalid");
         return edge;
     }
 
@@ -261,7 +261,7 @@ template <Copyable Tnode_data, Copyable Tedge_data> class orgraph_t {
         prev_node->out.splice(prev_node->out.end(), old_out, position);
         edge->prev = prev_node;
 
-	    GRAPH_ASSERT(this->check(), "Graph is invalid");
+	    GRAPH_ASSERT(orgraph_t::check(), "Graph is invalid");
     }
 
     void set_next_node(edge_iterator edge, node_iterator next_node) {
@@ -275,7 +275,7 @@ template <Copyable Tnode_data, Copyable Tedge_data> class orgraph_t {
         }
         next_node->in.splice(next_node->in.end(), old_in, position);
         edge->next = next_node;
-	    GRAPH_ASSERT(this->check(), "Graph is invalid");
+	    GRAPH_ASSERT(orgraph_t::check(), "Graph is invalid");
     }
 
     void erase_edge(edge_iterator edge) {
@@ -289,7 +289,7 @@ template <Copyable Tnode_data, Copyable Tedge_data> class orgraph_t {
         out.erase(out_position);
         in.erase(in_position);
         edges.erase(edge);
-	    GRAPH_ASSERT(this->check(), "Graph is invalid");
+	    GRAPH_ASSERT(orgraph_t::check(), "Graph is invalid");
     }
 
     void erase_node(node_iterator node) {
@@ -317,7 +317,7 @@ template <Copyable Tnode_data, Copyable Tedge_data> class orgraph_t {
             erase_edge(node->out.front());
         }
         nodes.erase(node);
-	    GRAPH_ASSERT(this->check(), "Graph is invalid");
+	    GRAPH_ASSERT(orgraph_t::check(), "Graph is invalid");
     }
 
 	virtual bool check() const {
@@ -470,7 +470,7 @@ template <Copyable Tnode_data, Copyable Tedge_data> class orgraph_t {
             edges.erase(edge);
             throw;
         }
-	    GRAPH_ASSERT(this->check(), "Graph is invalid");
+	    GRAPH_ASSERT(orgraph_t::check(), "Graph is invalid");
         return edge;
     }
 };
