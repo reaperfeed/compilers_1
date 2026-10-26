@@ -22,7 +22,7 @@ add_library(frontend_lib STATIC
         ${FLEX_Lexer_OUTPUTS}
 )
 
-target_link_libraries(frontend_lib PUBLIC tools hir)
+target_link_libraries(frontend_lib PUBLIC tools hir lir)
 
 target_include_directories(frontend_lib PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/src"

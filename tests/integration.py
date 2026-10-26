@@ -24,7 +24,7 @@ class FrontendTests(unittest.TestCase):
                 command.append("--check-only")
             command += [str(path), *args]
             result = subprocess.run(command, cwd=cwd, text=True, capture_output=True, timeout=30)
-            outputs = {name: (cwd / name).read_text() for name in ("hir.txt", "cfg.dot") if (cwd / name).exists()}
+            outputs = {name: (cwd / name).read_text() for name in ("hir.txt", "cfg.dot", "lir.txt") if (cwd / name).exists()}
             return result, outputs
 
     def valid(self, source, expected=None, *, existing=False, args=()):
@@ -32,6 +32,7 @@ class FrontendTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertIn("function", outputs["hir.txt"])
         self.assertIn("digraph CFG", outputs["cfg.dot"])
+        self.assertIn("function", outputs["lir.txt"])
         if expected:
             self.assertIn(expected, result.stdout)
         return result, outputs
@@ -192,10 +193,10 @@ class FrontendTests(unittest.TestCase):
             cwd = Path(temp)
             source = cwd / "source.lang"
             source.write_text("i32 main() { return 0; }")
-            result = subprocess.run([str(EXECUTABLE), "--check-only", "--hir", "out.hir", "--cfg", "out.dot",
+            result = subprocess.run([str(EXECUTABLE), "--check-only", "--hir", "out.hir", "--cfg", "out.dot", "--lir", "out.lir",
                                      "--ast", "tree.dot", str(source)], cwd=cwd, capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
-            for name in ("out.hir", "out.dot", "tree.dot"):
+            for name in ("out.hir", "out.dot", "out.lir", "tree.dot"):
                 self.assertGreater((cwd / name).stat().st_size, 0)
 
 

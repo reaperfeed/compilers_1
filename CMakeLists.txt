@@ -19,6 +19,7 @@ find_package(FLEX 2.6 REQUIRED)
 
 add_subdirectory(tools)
 add_subdirectory(hir)
+add_subdirectory(lir)
 add_subdirectory(frontend)
 include(CTest)
 if(BUILD_TESTING)
