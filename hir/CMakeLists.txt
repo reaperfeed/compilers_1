@@ -1,5 +1,6 @@
 add_library(hir STATIC
     hir.cpp
+    optimizer.cpp
     cfg.cpp
     verifier.cpp
     lowering.cpp

@@ -3,6 +3,7 @@
 #include "interpreter.hpp"
 #include "lexer.hpp"
 #include "hir/lowering.hpp"
+#include "hir/optimizer.hpp"
 #include "lir/lowering.hpp"
 #include "lir/c_codegen.hpp"
 #include "parser.hpp"
@@ -16,18 +17,20 @@
 
 namespace {
 void usage(const char* executable) {
-    std::cerr << "Usage: " << executable << " [--check-only] [--hir PATH] [--cfg PATH] [--lir PATH] [--emit-c PATH] [--ast PATH] <file.lang> [args...]\n";
+    std::cerr << "Usage: " << executable << " [--optimize] [--check-only] [--hir PATH] [--cfg PATH] [--cfg-before PATH] [--lir PATH] [--emit-c PATH] [--ast PATH] <file.lang> [args...]\n";
 }
+template <class Action>
+void write(const std::string& path, Action&& action) {
+    std::ofstream out(path);
+    if (!out) throw std::runtime_error("cannot open output file: " + path);
+    action(out);
+    out.close();
+    if (!out) throw std::runtime_error("cannot write output file: " + path);
+}
+
 void write_outputs(const ast::AstTree& tree, const hir::TranslationUnit& unit,
                    const lir::TranslationUnit& low_unit, const std::string& ast_path,
                    const std::string& hir_path, const std::string& cfg_path, const std::string& lir_path) {
-    auto write = [](const std::string& path, auto&& action) {
-        std::ofstream out(path);
-        if (!out) throw std::runtime_error("cannot open output file: " + path);
-        action(out);
-        out.close();
-        if (!out) throw std::runtime_error("cannot write output file: " + path);
-    };
     write(ast_path, [&](auto& out) { ast::dump_dot(tree, out); });
     write(hir_path, [&](auto& out) { hir::dump(unit, out); });
     write(cfg_path, [&](auto& out) { hir::dump_cfg_dot(unit, out); });
@@ -38,18 +41,21 @@ void write_outputs(const ast::AstTree& tree, const hir::TranslationUnit& unit,
 }
 int main(int argc, char** argv) {
     bool check_only = false;
+    bool optimize = false;
     std::string ast_path = "ast.dot", hir_path = "hir.txt", cfg_path = "cfg.dot", lir_path = "lir.txt";
-    std::string c_path;
+    std::string c_path, cfg_before_path;
     int index = 1;
     while (index < argc) {
         std::string option = argv[index];
         if (option == "--") { ++index; break; }
         if (option == "--help" || option == "-h") { usage(argv[0]); return 0; }
+        if (option == "--optimize") { optimize = true; ++index; continue; }
         if (option == "--check-only") { check_only = true; ++index; continue; }
-        if (option == "--hir" || option == "--cfg" || option == "--lir" || option == "--emit-c" || option == "--ast") {
+        if (option == "--hir" || option == "--cfg" || option == "--cfg-before" || option == "--lir" || option == "--emit-c" || option == "--ast") {
             if (index + 1 >= argc) { usage(argv[0]); return 1; }
             if (option == "--hir") hir_path = argv[index + 1];
             else if (option == "--cfg") cfg_path = argv[index + 1];
+            else if (option == "--cfg-before") cfg_before_path = argv[index + 1];
             else if (option == "--lir") lir_path = argv[index + 1];
             else if (option == "--emit-c") c_path = argv[index + 1];
             else ast_path = argv[index + 1];
@@ -73,6 +79,11 @@ int main(int argc, char** argv) {
         sema::SemanticAnalyzer analyzer;
         analyzer.analyze(builder.tree());
         auto unit = hir::lower(builder.tree());
+        if (!cfg_before_path.empty()) {
+            write(cfg_before_path, [&](auto& out) { hir::dump_cfg_dot(unit, out); });
+            std::cout << "[CFG before optimization written to " << cfg_before_path << "]\n";
+        }
+        if (optimize) hir::optimize_local(unit);
         auto low_unit = lir::lower(unit);
         write_outputs(builder.tree(), unit, low_unit, ast_path, hir_path, cfg_path, lir_path);
         if (!c_path.empty()) {

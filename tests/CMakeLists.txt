@@ -53,7 +53,16 @@ if(UNIX AND Python3_Interpreter_FOUND)
                 "$<TARGET_FILE:frontend>" "${PROJECT_SOURCE_DIR}"
                 "${CHIBICC_EXECUTABLE}" "$<TARGET_FILE:codegen_fixtures>")
         set_tests_properties(c_codegen_integration PROPERTIES TIMEOUT 300)
+        add_test(NAME optimized_c_codegen_integration
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/codegen_integration.py"
+                "$<TARGET_FILE:frontend>" "${PROJECT_SOURCE_DIR}"
+                "${CHIBICC_EXECUTABLE}" "$<TARGET_FILE:codegen_fixtures>" --optimize)
+        set_tests_properties(optimized_c_codegen_integration PROPERTIES TIMEOUT 300)
     else()
         message(STATUS "C codegen execution tests need -DCHIBICC_EXECUTABLE=/path/to/chibicc")
     endif()
 endif()
+
+add_executable(optimizer_tests optimizer_tests.cpp)
+target_link_libraries(optimizer_tests PRIVATE hir Catch2::Catch2WithMain)
+catch_discover_tests(optimizer_tests)

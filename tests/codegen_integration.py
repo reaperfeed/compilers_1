@@ -7,11 +7,14 @@ import tempfile
 import unittest
 
 FRONTEND, ROOT, CHIBICC, FIXTURES = [Path(x).resolve() for x in sys.argv[1:5]]
+OPTIMIZE = "--optimize" in sys.argv[5:]
 del sys.argv[1:]
 
 
 class CodegenTests(unittest.TestCase):
     def command(self, args, cwd):
+        if OPTIMIZE and Path(args[0]) == FRONTEND:
+            args = [args[0], "--optimize", *args[1:]]
         result = subprocess.run([str(x) for x in args], cwd=cwd, text=True,
                                 capture_output=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

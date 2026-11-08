@@ -11,7 +11,7 @@ del sys.argv[1:]
 
 
 class FrontendTests(unittest.TestCase):
-    def invoke(self, source, *, existing=False, check_only=False, args=()):
+    def invoke(self, source, *, existing=False, check_only=False, args=(), flags=()):
         with tempfile.TemporaryDirectory(prefix="frontend-", dir=Path.cwd()) as temp:
             cwd = Path(temp)
             if existing:
@@ -19,12 +19,12 @@ class FrontendTests(unittest.TestCase):
             else:
                 path = cwd / "input.lang"
                 path.write_text(source, encoding="utf-8")
-            command = [str(EXECUTABLE)]
+            command = [str(EXECUTABLE), *flags]
             if check_only:
                 command.append("--check-only")
             command += [str(path), *args]
             result = subprocess.run(command, cwd=cwd, text=True, capture_output=True, timeout=30)
-            outputs = {name: (cwd / name).read_text() for name in ("hir.txt", "cfg.dot", "lir.txt") if (cwd / name).exists()}
+            outputs = {name: (cwd / name).read_text() for name in ("hir.txt", "cfg.dot", "lir.txt", "before.dot") if (cwd / name).exists()}
             return result, outputs
 
     def valid(self, source, expected=None, *, existing=False, args=()):
@@ -36,6 +36,22 @@ class FrontendTests(unittest.TestCase):
         if expected:
             self.assertIn(expected, result.stdout)
         return result, outputs
+
+    def test_cfg_before_and_after_in_one_run(self):
+        source = 'i32 main() { i32 a = 2; return a + 3; }'
+        original, baseline = self.invoke(source, check_only=True)
+        self.assertEqual(original.returncode, 0, original.stderr)
+        result, outputs = self.invoke(source, check_only=True,
+                                      flags=("--optimize", "--cfg-before", "before.dot"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(outputs["before.dot"], baseline["cfg.dot"])
+        self.assertIn("add ", outputs["before.dot"])
+        self.assertNotIn("add ", outputs["cfg.dot"])
+        self.assertIn("i32 5", outputs["cfg.dot"])
+        result, outputs = self.invoke(source, check_only=True,
+                                      flags=("--cfg-before", "before.dot"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(outputs["before.dot"], outputs["cfg.dot"])
 
     def test_original_valid_programs(self):
         expected = {
