@@ -63,6 +63,9 @@ struct Instruction {
     Opcode opcode = Opcode::Trap;
     std::vector<Operand> operands;
     ast::SourceLocation loc;
+    // Arithmetic operand type (also distinguishes floating comparisons).
+    // For Convert this is the source type; for calls it describes the value.
+    hir::Type value_type = hir::Type::int_type();
 };
 
 struct Function {

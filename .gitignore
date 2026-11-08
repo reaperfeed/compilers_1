@@ -1,0 +1,9 @@
+build/
+build-*/
+CMakeUserPresets.json
+/ast.dot
+/hir.txt
+/cfg.dot
+/graph.dot
+__pycache__/
+*.pyc

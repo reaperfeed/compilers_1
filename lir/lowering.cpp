@@ -45,8 +45,8 @@ class FunctionLowerer {
 
     Register fresh_register() { return {RegisterKind::Virtual, next_vreg_++}; }
     void emit(Opcode opcode, std::initializer_list<Operand> operands,
-              ast::SourceLocation location = {}) {
-        result_.instructions.push_back(Instruction{opcode, std::vector<Operand>(operands), location});
+              ast::SourceLocation location = {}, hir::Type value_type = hir::Type::int_type()) {
+        result_.instructions.push_back(Instruction{opcode, std::vector<Operand>(operands), location, std::move(value_type)});
     }
     const hir::Object& object(hir::ObjectId id) const { return unit_.object(source_, id); }
     const hir::Type& type(hir::ObjectId id) const { return object(id).type; }
@@ -238,10 +238,10 @@ class FunctionLowerer {
             auto id = source_.parameters[i];
             const auto& where = location(id);
             if (const auto* reg = std::get_if<Register>(&where)) {
-                emit(Opcode::GetArgument, {*reg, static_cast<std::int64_t>(i)});
+                emit(Opcode::GetArgument, {*reg, static_cast<std::int64_t>(i)}, {}, type(id));
             } else {
                 emit(Opcode::GetArgument,
-                     {frame_memory(std::get<FrameSlot>(where), type_size(type(id))), static_cast<std::int64_t>(i)});
+                     {frame_memory(std::get<FrameSlot>(where), type_size(type(id))), static_cast<std::int64_t>(i)}, {}, type(id));
             }
         }
     }
@@ -414,9 +414,9 @@ class FunctionLowerer {
             auto id = operation.arguments[i];
             if (aggregate(type(id))) {
                 auto memory = object_memory(id, operation.loc);
-                emit(Opcode::SetArgument, {static_cast<std::int64_t>(i), memory}, operation.loc);
+                emit(Opcode::SetArgument, {static_cast<std::int64_t>(i), memory}, operation.loc, type(id));
             } else {
-                emit(Opcode::SetArgument, {static_cast<std::int64_t>(i), read_value(id, operation.loc)}, operation.loc);
+                emit(Opcode::SetArgument, {static_cast<std::int64_t>(i), read_value(id, operation.loc)}, operation.loc, type(id));
             }
         }
         if (indirect) {
@@ -430,10 +430,10 @@ class FunctionLowerer {
         }
         if (auto destination = object_arg(operation, 0)) {
             if (aggregate(type(*destination))) {
-                emit(Opcode::GetReturn, {object_memory(*destination, operation.loc)}, operation.loc);
+                emit(Opcode::GetReturn, {object_memory(*destination, operation.loc)}, operation.loc, type(*destination));
             } else {
                 auto result = destination_register(*destination, operation.loc);
-                emit(Opcode::GetReturn, {result}, operation.loc);
+                emit(Opcode::GetReturn, {result}, operation.loc, type(*destination));
                 save_result(*destination, result, operation.loc);
             }
         }
@@ -441,8 +441,8 @@ class FunctionLowerer {
 
     void lower_return(const hir::Operation& operation) {
         if (auto value = object_arg(operation, 0)) {
-            if (aggregate(type(*value))) emit(Opcode::SetReturn, {object_memory(*value, operation.loc)}, operation.loc);
-            else emit(Opcode::SetReturn, {read_value(*value, operation.loc)}, operation.loc);
+            if (aggregate(type(*value))) emit(Opcode::SetReturn, {object_memory(*value, operation.loc)}, operation.loc, type(*value));
+            else emit(Opcode::SetReturn, {read_value(*value, operation.loc)}, operation.loc, type(*value));
         }
         emit_epilogue(operation.loc);
     }
@@ -473,7 +473,10 @@ class FunctionLowerer {
             auto destination = object_arg(operation, 0), source = object_arg(operation, 1);
             if (!destination || !source) throw LoweringError("convert operands are malformed");
             auto result = destination_register(*destination, operation.loc);
-            emit(Opcode::Convert, {result, read_value(*source, operation.loc), type(*destination).str()}, operation.loc);
+            if (type(*source).kind == hir::TypeKind::Pointer && type(*destination).kind == hir::TypeKind::Pointer)
+                emit(Opcode::Move, {result, read_value(*source, operation.loc)}, operation.loc);
+            else
+                emit(Opcode::Convert, {result, read_value(*source, operation.loc), type(*destination).str()}, operation.loc, type(*source));
             save_result(*destination, result, operation.loc); return;
         }
         case hir::Opcode::Neg: case hir::Opcode::LogicalNot: case hir::Opcode::BitNot: {
@@ -482,7 +485,7 @@ class FunctionLowerer {
             auto result = destination_register(*destination, operation.loc);
             const auto opcode = operation.opcode == hir::Opcode::Neg ? Opcode::Neg :
                                 operation.opcode == hir::Opcode::LogicalNot ? Opcode::LogicalNot : Opcode::BitNot;
-            emit(opcode, {result, read_value(*source, operation.loc)}, operation.loc);
+            emit(opcode, {result, read_value(*source, operation.loc)}, operation.loc, type(*source));
             save_result(*destination, result, operation.loc); return;
         }
         default: break;
@@ -494,7 +497,7 @@ class FunctionLowerer {
         if (!destination || !left || !right) throw LoweringError("binary operation operands are malformed");
         auto result = destination_register(*destination, operation.loc);
         emit(lower_binary(operation.opcode),
-             {result, read_value(*left, operation.loc), read_value(*right, operation.loc)}, operation.loc);
+             {result, read_value(*left, operation.loc), read_value(*right, operation.loc)}, operation.loc, type(*left));
         save_result(*destination, result, operation.loc);
     }
 

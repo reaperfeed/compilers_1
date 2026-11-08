@@ -36,6 +36,20 @@ namespace sema {
 			scopes_.current().declare(std::move(s));
 		}
 
+        // Runtime calls used by generated C. Pointers have Unknown in this analyzer;
+        // precise pointer compatibility is checked by HIR lowering.
+        auto runtime = [&](const char* name, Type result, std::vector<Type> params) {
+            Symbol symbol{name, Symbol::Kind::Function, result, {}, false, {}};
+            symbol.param_types = std::move(params);
+            scopes_.current().declare(std::move(symbol));
+        };
+        runtime("open", Type::Int, {Type::String, Type::Int, Type::Int});
+        runtime("read", Type::Int, {Type::Int, Type::Unknown, Type::Int});
+        runtime("write", Type::Int, {Type::Int, Type::Unknown, Type::Int});
+        runtime("close", Type::Int, {Type::Int});
+        runtime("malloc", Type::Unknown, {Type::Int});
+        runtime("free", Type::Void, {Type::Unknown});
+
 		if (tree.begin() == tree.end()) return;
 		auto root = tree.root();
 		if (root == tree.end()) return;

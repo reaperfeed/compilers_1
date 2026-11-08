@@ -38,3 +38,22 @@ if(Python3_Interpreter_FOUND)
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/integration.py"
                 "$<TARGET_FILE:frontend>" "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
+
+# Fixture programs exercise LIR features not exposed by the source grammar.
+add_executable(codegen_fixtures codegen_fixtures.cpp)
+target_link_libraries(codegen_fixtures PRIVATE lir)
+
+if(UNIX AND Python3_Interpreter_FOUND)
+    find_program(CHIBICC_EXECUTABLE NAMES chibicc
+        HINTS "$ENV{HOME}/compiler-tools/chibicc"
+        DOC "chibicc used to compile and execute generated C")
+    if(CHIBICC_EXECUTABLE)
+        add_test(NAME c_codegen_integration
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/codegen_integration.py"
+                "$<TARGET_FILE:frontend>" "${PROJECT_SOURCE_DIR}"
+                "${CHIBICC_EXECUTABLE}" "$<TARGET_FILE:codegen_fixtures>")
+        set_tests_properties(c_codegen_integration PROPERTIES TIMEOUT 300)
+    else()
+        message(STATUS "C codegen execution tests need -DCHIBICC_EXECUTABLE=/path/to/chibicc")
+    endif()
+endif()

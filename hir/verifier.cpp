@@ -115,10 +115,18 @@ void verify_operation(const TranslationUnit& unit, const Function& f, const Oper
         check(field && field->index < type(1).fields.size(), "field index out of bounds");
         check(type(0) == Type::pointer(type(1).fields[field->index].second), "field address type mismatch"); break;
     }
-    case Opcode::Convert:
+    case Opcode::Convert: {
         shape(2);
-        check(type(0).kind != TypeKind::Pointer && type(1).kind != TypeKind::Pointer && type(0).is_scalar() && type(1).is_scalar(),
-              "conversion requires numeric, bool or char types"); break;
+        // Internal decay of an addressed subarray to its first element. Other
+        // pointer conversions remain invalid at the typed HIR level.
+        const auto& from = type(1);
+        const bool decay = from.kind == TypeKind::Pointer && from.element &&
+            from.element->kind == TypeKind::Array && from.element->element &&
+            type(0) == Type::pointer(*from.element->element);
+        check(decay || (type(0).kind != TypeKind::Pointer && from.kind != TypeKind::Pointer &&
+                        type(0).is_scalar() && from.is_scalar()),
+              "conversion requires scalar types or an addressed subarray decay"); break;
+    }
     case Opcode::Label: case Opcode::Jump: shape(1); label(0); break;
     case Opcode::Branch: shape(3); check(type(0) == Type::bool_type(), "branch condition must be bool"); label(1); label(2); break;
     case Opcode::Call: case Opcode::CallIndirect: {

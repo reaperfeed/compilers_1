@@ -136,7 +136,19 @@ class Lowerer {
             return {pointer, true};
         }
         if (n->data().kind == Kind::Index) {
-            auto base = value(required(n, Role::Base));
+            auto base_node = required(n, Role::Base);
+            ObjectId base;
+            if (base_node->data().kind == Kind::Index ||
+                (base_node->data().kind == Kind::Unary &&
+                 std::get<ast::UnaryOp>(base_node->data().value) == ast::UnaryOp::Deref)) {
+                auto inner = lvalue(base_node);
+                auto inner_type = lvalue_type(inner);
+                if (inner.indirect && inner_type.kind == TypeKind::Array) {
+                    // Index the original subarray, not an aggregate value copy.
+                    base = temp(Type::pointer(*inner_type.element));
+                    emit(Opcode::Convert, base, inner.id, {}, n);
+                } else base = read(inner, n);
+            } else base = value(base_node);
             auto index = value(required(n, Role::Subscript));
             const auto t = object_type(base);
             if ((t.kind != TypeKind::Array && t.kind != TypeKind::Pointer) || !t.element || !t.element->is_value())
@@ -354,12 +366,25 @@ class Lowerer {
         functions_.emplace(std::move(key), FunctionId{unit_.functions.size()});
         unit_.functions.push_back(std::move(fn));
     }
+    void add_runtime(std::string key, Type result, std::vector<Type> parameters) {
+        Function fn;
+        fn.name = key; fn.result = std::move(result); fn.parameter_types = std::move(parameters); fn.external = true;
+        functions_.emplace(std::move(key), FunctionId{unit_.functions.size()});
+        unit_.functions.push_back(std::move(fn));
+    }
 public:
     TranslationUnit run(const ast::AstTree& tree) {
         if (!tree.check() || tree.begin() == tree.end()) throw ValidationError("AST is not a non-empty tree");
         auto root = tree.root();
         if (root->data().kind != Kind::Program) fail(root, "AST root is not a program");
         add_builtin("prints", Builtin::Print); add_builtin("printi", Builtin::Print); add_builtin("printf", Builtin::Printf);
+        const auto integer = Type::int_type(), chars = Type::pointer(Type::char_type());
+        add_runtime("open", integer, {chars, integer, integer});
+        add_runtime("read", integer, {integer, chars, integer});
+        add_runtime("write", integer, {integer, chars, integer});
+        add_runtime("close", integer, {integer});
+        add_runtime("malloc", chars, {integer});
+        add_runtime("free", Type::void_type(), {chars});
         // Register complete signatures first, so forward and mutually recursive calls work.
         children(root, Role::Func, [&](Node n) {
             Function fn;
