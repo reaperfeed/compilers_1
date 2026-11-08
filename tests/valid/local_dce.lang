@@ -1,0 +1,8 @@
+i32 keep(i32 x) {
+    i32 dead = x * 7;
+    return x;
+}
+
+i32 main() {
+    return keep(12);
+}

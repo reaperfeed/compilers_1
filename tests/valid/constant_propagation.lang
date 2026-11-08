@@ -1,0 +1,9 @@
+i32 constant_value() {
+    i32 a = 7;
+    i32 b = a;
+    return b;
+}
+
+i32 main() {
+    return constant_value();
+}

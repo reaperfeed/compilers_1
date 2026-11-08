@@ -1,0 +1,8 @@
+i32 simplify(i32 x) {
+    i32 same = x + 0;
+    return same * 1;
+}
+
+i32 main() {
+    return simplify(12);
+}
